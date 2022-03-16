@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-screwdriver",
 	"name": "Screwdriver",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"minAppVersion": "0.12.0",
-	"description": "Utility for picking and putting hidden files",
+	"description": "Utility to put any files in and out under your vault.",
 	"author": "vorotamoroz",
 	"authorUrl": "https://github.com/vrtmrz",
 	"isDesktopOnly": false

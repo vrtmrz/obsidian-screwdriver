@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-screwdriver",
-	"version": "0.0.1",
-	"description": "Utility for picking and putting hidden files",
+	"version": "0.0.3",
+	"description": "Utility to put any files in and out under your vault.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
