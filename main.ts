@@ -88,6 +88,27 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 	}
 }
 
+async function ensureDirectory(app: App, fullpath: string) {
+	const pathElements = fullpath.split("/");
+	pathElements.pop();
+	let c = "";
+	for (const v of pathElements) {
+		c += v;
+		try {
+			await app.vault.createFolder(c);
+		} catch (ex) {
+			// basically skip exceptions.
+			if (ex.message && ex.message == "Folder already exists.") {
+				// especialy this message is.
+			} else {
+				new Notice("Folder Create Error");
+				console.log(ex);
+			}
+		}
+		c += "/";
+	}
+}
+
 export default class ScrewDriverPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
@@ -112,6 +133,7 @@ export default class ScrewDriverPlugin extends Plugin {
 				editor.setValue(`---
 # --- Select a directory to dump. ---
 ${targets}
+
 # --- Prefixes to ignore. ---
 ignores:
 - /node_modules
@@ -131,17 +153,14 @@ filters:
 			name: "Dump files",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const data = view.data;
-				const stx = data.indexOf("\n---");
-				if (!data.startsWith("---") || stx === -1) {
+				const bodyStartIndex = data.indexOf("\n---");
+				if (!data.startsWith("---") || bodyStartIndex === -1) {
 					new Notice("Frontmatter was not found.");
 				}
 				//
-				const yaml = data.substring(3, stx);
-				console.dir(yaml);
+				const yaml = data.substring(3, bodyStartIndex);
 				const yamlData = parseYaml(yaml);
 				let newData = "---" + yaml + "\n---\n\n";
-				// const fileData = data.substring(stx+3);
-				console.dir(yamlData);
 				const target = yamlData.target ?? "";
 				const ignoresSrc = yamlData.ignores;
 				const ignores: string[] = Array.isArray(ignoresSrc)
@@ -196,18 +215,15 @@ filters:
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const data = view.data;
 				if (data.startsWith("---")) {
-					const stx = data.indexOf("\n---");
+					const bodyStartIndex = data.indexOf("\n---");
 
-					if (stx !== -1) {
-						const ww = data
-							.substring(stx)
+					if (bodyStartIndex !== -1) {
+						const preBlocks = data
+							.substring(bodyStartIndex)
 							.matchAll(/^```([\s\S]*?)\n([\s\S]*?)^```/gm);
-						for (const www of ww) {
-							console.dir(www);
-							const [, filename, data] = www;
+						for (const preBlock of preBlocks) {
+							const [, filename, data] = preBlock;
 							let saveData = data;
-
-							console.log(filename);
 							try {
 								if (isPlainText(filename)) {
 									saveData = saveData.replace(/\\`/g, "`");
@@ -216,13 +232,15 @@ filters:
 										0,
 										saveData.lastIndexOf("\n")
 									);
+									await ensureDirectory(this.app, filename);
 									await this.app.vault.adapter.write(
 										filename,
 										saveData
 									);
 								} else {
 									const saveDataArrayBuffer =
-										await base64ToArrayBuffer(saveData);
+										base64ToArrayBuffer(saveData);
+									await ensureDirectory(this.app, filename);
 									await this.app.vault.adapter.writeBinary(
 										filename,
 										saveDataArrayBuffer
@@ -233,7 +251,7 @@ filters:
 								);
 							} catch (ex) {
 								new Notice(`Failed to write ${filename}`);
-								console.dir(ex);
+								console.log(ex);
 							}
 						}
 						return;
