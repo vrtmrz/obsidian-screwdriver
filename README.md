@@ -2,6 +2,8 @@
 
 The plugin for picking and putting hidden files.
 
+![screenshot](https://user-images.githubusercontent.com/45774780/158567788-fbea41ba-d07d-4faf-bc09-ce241a0c9f67.gif)
+
 You can dump your files which stored in the specified directory, or put dumped files into any path under your vault.
 
 ### How to use
