@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin } from "obsidian";
+import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer } from "obsidian";
 
 // Util functions
 async function getFiles(
@@ -50,42 +50,9 @@ function isPlainText(filename: string): boolean {
 	if (filename.endsWith(".json")) return true;
 	if (filename.endsWith(".xml")) return true;
 	if (filename.endsWith(".ts")) return true;
+	if (filename.endsWith(".canvas")) return true;
 
 	return false;
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): Promise<string> {
-	return new Promise((res) => {
-		const blob = new Blob([buffer], { type: "application/octet-binary" });
-		const reader = new FileReader();
-		reader.onload = function (evt) {
-			const dataurl = evt.target.result.toString();
-			res(dataurl.substr(dataurl.indexOf(",") + 1));
-		};
-		reader.readAsDataURL(blob);
-	});
-}
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-	try {
-		const binary_string = window.atob(base64);
-		const len = binary_string.length;
-		const bytes = new Uint8Array(len);
-		for (let i = 0; i < len; i++) {
-			bytes[i] = binary_string.charCodeAt(i);
-		}
-		return bytes.buffer;
-	} catch (ex) {
-		try {
-			return new Uint16Array(
-				[].map.call(base64, function (c: string) {
-					return c.charCodeAt(0);
-				})
-			).buffer;
-		} catch (ex2) {
-			return null;
-		}
-	}
 }
 
 async function ensureDirectory(app: App, fullpath: string) {
@@ -134,6 +101,10 @@ export default class ScrewDriverPlugin extends Plugin {
 # --- Select a directory to dump. ---
 ${targets}
 
+# --- Or, specify URLs to fetch.
+urls:
+# - https://gist.githubusercontent.com/vrtmrz/8b638347f56d1dad25414953bb95d7b6/raw/77f2965f79e9390b88dd17d5f23475b1f8b8085a/ninja-cursor-snippets.css
+
 # --- Prefixes to ignore. ---
 ignores:
 - /node_modules
@@ -150,7 +121,7 @@ filters:
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: "screwdriver-dump",
-			name: "Dump files",
+			name: "Dump or fetch files",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const data = view.data;
 				const bodyStartIndex = data.indexOf("\n---");
@@ -170,42 +141,74 @@ filters:
 				const filters = !filterSrc
 					? null
 					: filterSrc.map((e: string) => new RegExp(e));
-				if (target.trim() == "") {
-					new Notice("Target folder not specified.");
+
+				const urls = (yamlData.urls ?? "");
+				if (target.trim() == "" && urls == "") {
+					new Notice("Target folders or urls are not specified.");
 					return;
 				}
-				const files = await getFiles(
-					this.app,
-					target,
-					ignores,
-					filters
-				);
-				for (const file of files) {
-					let fileDat = "";
-					const stat = await this.app.vault.adapter.stat(file);
-					if (isPlainText(file)) {
-						fileDat = await this.app.vault.adapter.read(file);
-						fileDat = fileDat.replace(/\\/g, "\\\\");
-						fileDat = fileDat.replace(/`/g, "\\`");
-					} else {
-						const dtSrc = await this.app.vault.adapter.readBinary(
-							file
-						);
-						fileDat = await arrayBufferToBase64(dtSrc);
-					}
-					newData += "\n";
-					newData += `# ${file} \n`;
-					newData += `- Created :${new Date(
-						stat.ctime
-					).toLocaleString()} \n`;
-					newData += `- Modified:${new Date(
-						stat.mtime
-					).toLocaleString()} \n`;
-					newData += "\n```" + file + "\n";
-					newData += fileDat + "";
-					newData += "\n```";
-				}
+				for (const url of urls) {
+					try {
+						let fileDat = "";
+						let bin = false;
+						const w = await requestUrl(url);
+						const filename = new URL(url).pathname.split("/").last();
+						const dt = w.arrayBuffer;
 
+						try {
+							const text = new TextDecoder("utf-8", { fatal: true }).decode(dt);
+							fileDat = text;
+							fileDat = fileDat.replace(/\\/g, "\\\\");
+							fileDat = fileDat.replace(/`/g, "\\`");
+						} catch (ex2) {
+							fileDat = await arrayBufferToBase64(dt);
+							bin = true;
+						}
+						newData += "\n";
+						newData += `# ${url} \n`;
+						newData += `- Fetched :${new Date().toLocaleString()} \n`;
+						newData += "\n```" + filename + (bin ? ":bin" : "") + "\n";
+						newData += fileDat + "";
+						newData += "\n```";
+					} catch (ex) {
+						new Notice(`Error on fetching ${url}\n${ex}`);
+					}
+
+				}
+				if (target != "") {
+					const files = await getFiles(
+						this.app,
+						target,
+						ignores,
+						filters
+					);
+					for (const file of files) {
+						let fileDat = "";
+						const stat = await this.app.vault.adapter.stat(file);
+						if (isPlainText(file)) {
+							fileDat = await this.app.vault.adapter.read(file);
+							fileDat = fileDat.replace(/\\/g, "\\\\");
+							fileDat = fileDat.replace(/`/g, "\\`");
+						} else {
+							const dtSrc = await this.app.vault.adapter.readBinary(
+								file
+							);
+							fileDat = await arrayBufferToBase64(dtSrc);
+						}
+						newData += "\n";
+						newData += `# ${file} \n`;
+						newData += `- Created :${new Date(
+							stat.ctime
+						).toLocaleString()} \n`;
+						newData += `- Modified:${new Date(
+							stat.mtime
+						).toLocaleString()} \n`;
+						newData += "\n```" + file + "\n";
+						newData += fileDat + "";
+						newData += "\n```";
+
+					}
+				}
 				editor.setValue(newData);
 			},
 		});
@@ -222,10 +225,12 @@ filters:
 							.substring(bodyStartIndex)
 							.matchAll(/^```([\s\S]*?)\n([\s\S]*?)^```/gm);
 						for (const preBlock of preBlocks) {
-							const [, filename, data] = preBlock;
+							const [, filenameSrc, data] = preBlock;
+							const [filename, isBin] = `${filenameSrc}:`.split(":");
+							console.dir(isBin);
 							let saveData = data;
 							try {
-								if (isPlainText(filename)) {
+								if (isPlainText(filename) && isBin != "bin") {
 									saveData = saveData.replace(/\\`/g, "`");
 									saveData = saveData.replace(/\\\\/g, "\\");
 									saveData = saveData.substring(
@@ -238,6 +243,10 @@ filters:
 										saveData
 									);
 								} else {
+									saveData = saveData.substring(
+										0,
+										saveData.lastIndexOf("\n")
+									);
 									const saveDataArrayBuffer =
 										base64ToArrayBuffer(saveData);
 									await ensureDirectory(this.app, filename);
@@ -262,9 +271,9 @@ filters:
 		});
 	}
 
-	onunload() {}
+	onunload() { }
 
-	async loadSettings() {}
+	async loadSettings() { }
 
-	async saveSettings() {}
+	async saveSettings() { }
 }

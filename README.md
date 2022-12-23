@@ -4,7 +4,7 @@ The plugin for picking and putting hidden files.
 
 ![screenshot](https://user-images.githubusercontent.com/45774780/158567788-fbea41ba-d07d-4faf-bc09-ce241a0c9f67.gif)
 
-You can dump your files which stored in the specified directory, or put dumped files into any path under your vault.
+You can dump your files which are stored in the specified directory, or put dumped files into any path under your vault.
 
 ### How to use
 
@@ -43,6 +43,10 @@ All you have to do is pick the target directory.
 ---
 # --- Select a directory to dump. ---
 target: .obsidian/snippets
+
+# --- Or, specify URLs to fetch.
+urls:
+# - https://gist.githubusercontent.com/vrtmrz/8b638347f56d1dad25414953bb95d7b6/raw/77f2965f79e9390b88dd17d5f23475b1f8b8085a/ninja-cursor-snippets.css
 
 # --- Prefixes to ignore. ---
 ignores:
