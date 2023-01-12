@@ -184,16 +184,17 @@ filters:
 					);
 					for (const file of files) {
 						let fileDat = "";
+						let bin = false;
+						const dt = await this.app.vault.adapter.readBinary(file);
 						const stat = await this.app.vault.adapter.stat(file);
-						if (isPlainText(file)) {
-							fileDat = await this.app.vault.adapter.read(file);
+						try {
+							const text = new TextDecoder("utf-8", { fatal: true }).decode(dt);
+							fileDat = text;
 							fileDat = fileDat.replace(/\\/g, "\\\\");
 							fileDat = fileDat.replace(/`/g, "\\`");
-						} else {
-							const dtSrc = await this.app.vault.adapter.readBinary(
-								file
-							);
-							fileDat = await arrayBufferToBase64(dtSrc);
+						} catch (ex2) {
+							fileDat = await arrayBufferToBase64(dt);
+							bin = true;
 						}
 						newData += "\n";
 						newData += `# ${file} \n`;
@@ -203,7 +204,7 @@ filters:
 						newData += `- Modified:${new Date(
 							stat.mtime
 						).toLocaleString()} \n`;
-						newData += "\n```" + file + "\n";
+						newData += "\n```" + file + ":" + (bin ? "bin" : "plain") + "\n";
 						newData += fileDat + "";
 						newData += "\n```";
 
@@ -226,11 +227,10 @@ filters:
 							.matchAll(/^```([\s\S]*?)\n([\s\S]*?)^```/gm);
 						for (const preBlock of preBlocks) {
 							const [, filenameSrc, data] = preBlock;
-							const [filename, isBin] = `${filenameSrc}:`.split(":");
-							console.dir(isBin);
+							const [filename, dataType] = `${filenameSrc}:`.split(":");
 							let saveData = data;
 							try {
-								if (isPlainText(filename) && isBin != "bin") {
+								if ((isPlainText(filename) && dataType != "bin") || dataType == "plain") {
 									saveData = saveData.replace(/\\`/g, "`");
 									saveData = saveData.replace(/\\\\/g, "\\");
 									saveData = saveData.substring(
@@ -258,8 +258,10 @@ filters:
 								new Notice(
 									`File:${filename} has been wrote to your device.`
 								);
+								console.log(`File:${filename} has been wrote to your device.`)
 							} catch (ex) {
 								new Notice(`Failed to write ${filename}`);
+								console.error(`Failed to write ${filename}`)
 								console.log(ex);
 							}
 						}
@@ -267,6 +269,7 @@ filters:
 					}
 				}
 				new Notice("Frontmatter was not found.");
+				console.error("Frontmatter was not found")
 			},
 		});
 	}
