@@ -62,7 +62,7 @@ filters:
 - Created :2021/4/01 04:11:10
 - Modified:2022/1/10 06:34:03
 
-```.obsidian/snippets/fonts_jp.css
+```screwdriver:.obsidian/snippets/fonts_jp.css
 :root {
     --default-font: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif, Apple Color Emoji, Segoe UI Emoji;
     --editor-font: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -77,6 +77,6 @@ Note: Dumped files can be modifiable by editing the doc.
 #### Restore
 `Ctrl+P` -> `Restore files` to restore files into your storage.
 
-Note: Wrote as the filename following ```
+Note: Wrote as the filename following \`\`\` or \`\`\`screwdriver:
 
 If you're using [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync) or [remotely-save](https://github.com/fyears/remotely-save), it could be useful to synchronize your configuration between devices.

@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer } from "obsidian";
+import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer } from "obsidian";
 
 // Util functions
 async function getFiles(
@@ -167,7 +167,7 @@ filters:
 						newData += "\n";
 						newData += `# ${url} \n`;
 						newData += `- Fetched :${new Date().toLocaleString()} \n`;
-						newData += "\n```" + filename + (bin ? ":bin" : "") + "\n";
+						newData += "\n```screwdriver:" + filename + (bin ? ":bin" : "") + "\n";
 						newData += fileDat + "";
 						newData += "\n```";
 					} catch (ex) {
@@ -204,7 +204,7 @@ filters:
 						newData += `- Modified:${new Date(
 							stat.mtime
 						).toLocaleString()} \n`;
-						newData += "\n```" + file + ":" + (bin ? "bin" : "plain") + "\n";
+						newData += "\n```screwdriver:" + file + ":" + (bin ? "bin" : "plain") + "\n";
 						newData += fileDat + "";
 						newData += "\n```";
 
@@ -212,6 +212,17 @@ filters:
 				}
 				editor.setValue(newData);
 			},
+		});
+		this.registerMarkdownCodeBlockProcessor("screwdriver", (source, el, ctx) => {
+			const sourcePath = ctx.sourcePath;
+			const si = ctx.getSectionInfo(el);
+			const fxx = si.text.split("\n")[si.lineStart];
+			const filename = `${fxx}:::`.split(":")[1];
+			const rSource = `${"```\n"}${source}${"\n```"}`;
+			const renderSource = `> [!screwdriver]- ${filename}\n${rSource.replace(/^/mg, "> ")}`;
+			const fx = el.createDiv({ text: "", cls: ["screwdriver-display"] });
+			MarkdownRenderer.renderMarkdown(renderSource, fx, sourcePath, this)
+			el.replaceWith(fx);
 		});
 		this.addCommand({
 			id: "screwdriver-restore",
@@ -224,8 +235,8 @@ filters:
 					if (bodyStartIndex !== -1) {
 						const preBlocks = data
 							.substring(bodyStartIndex)
-							.matchAll(/^```([\s\S]*?)\n([\s\S]*?)^```/gm);
-						for (const preBlock of preBlocks) {
+							.matchAll(/^```(?:screwdriver:|)([\s\S]*?)\n([\s\S]*?)^```/gm);
+							for (const preBlock of preBlocks) {
 							const [, filenameSrc, data] = preBlock;
 							const [filename, dataType] = `${filenameSrc}:`.split(":");
 							let saveData = data;
