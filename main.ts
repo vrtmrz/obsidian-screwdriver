@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer } from "obsidian";
+import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, FuzzySuggestModal } from "obsidian";
 
 // Util functions
 async function getFiles(
@@ -79,7 +79,23 @@ async function ensureDirectory(app: App, fullpath: string) {
 export default class ScrewDriverPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
-
+		this.addCommand({
+			id: "screwdriver-add-target-dir",
+			name: "Add target directory",
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				const list = await getDirectories(
+					this.app,
+					this.app.vault.configDir,
+					["node_modules", ".git"]
+				);
+				const selected = await askSelectString(this.app, "Select target directory", list);
+				if (selected) {
+					this.app.fileManager.processFrontMatter(view.file, fm => {
+						fm.targets = [...fm.targets ?? [], selected];
+					})
+				}
+			}
+		});
 		this.addCommand({
 			id: "screwdriver-create-template",
 			name: "Create dump template",
@@ -91,28 +107,18 @@ export default class ScrewDriverPlugin extends Plugin {
 					);
 					return;
 				}
-				const list = await getDirectories(
-					this.app,
-					this.app.vault.configDir,
-					["node_modules", ".git"]
-				);
-				const targets = list.map((e) => `# target: ${e}`).join("\n");
 				editor.setValue(`---
-# --- Select a directory to dump. ---
-${targets}
-
-# --- Or, specify URLs to fetch.
-urls:
-# - https://gist.githubusercontent.com/vrtmrz/8b638347f56d1dad25414953bb95d7b6/raw/77f2965f79e9390b88dd17d5f23475b1f8b8085a/ninja-cursor-snippets.css
-
-# --- Prefixes to ignore. ---
+targets: []
+urls: []
 ignores:
-- /node_modules
-- /.git
-
-# --- Regular expressions for filtering files
+  - "/node_modules"
+  - "/.git"
 filters:
-# - \\.js
+  - "main\\\\.js$"
+  - "manifest\\\\.json$"
+  - "styles\\\\.css$"
+comment: "'Add target directory' to add targets"
+tags: []
 ---
 
 `);
@@ -133,6 +139,9 @@ filters:
 				const yamlData = parseYaml(yaml);
 				let newData = "---" + yaml + "\n---\n\n";
 				const target = yamlData.target ?? "";
+				let targets = (yamlData.targets ?? []) as string[];
+				if (target) targets = [...targets, target];
+				targets = targets.map(e => e.trim()).filter(e => e != "");
 				const ignoresSrc = yamlData.ignores;
 				const ignores: string[] = Array.isArray(ignoresSrc)
 					? ignoresSrc
@@ -143,7 +152,7 @@ filters:
 					: filterSrc.map((e: string) => new RegExp(e));
 
 				const urls = (yamlData.urls ?? "");
-				if (target.trim() == "" && urls == "") {
+				if (targets.length == 0 && urls == "") {
 					new Notice("Target folders or urls are not specified.");
 					return;
 				}
@@ -175,7 +184,7 @@ filters:
 					}
 
 				}
-				if (target != "") {
+				for (const target of targets) {
 					const files = await getFiles(
 						this.app,
 						target,
@@ -236,7 +245,7 @@ filters:
 						const preBlocks = data
 							.substring(bodyStartIndex)
 							.matchAll(/^```(?:screwdriver:|)([\s\S]*?)\n([\s\S]*?)^```/gm);
-							for (const preBlock of preBlocks) {
+						for (const preBlock of preBlocks) {
 							const [, filenameSrc, data] = preBlock;
 							const [filename, dataType] = `${filenameSrc}:`.split(":");
 							let saveData = data;
@@ -291,3 +300,50 @@ filters:
 
 	async saveSettings() { }
 }
+
+
+export class PopoverSelectString extends FuzzySuggestModal<string> {
+	app: App;
+	callback: (e: string) => void = () => { };
+	getItemsFun: () => string[] = () => {
+		return ["yes", "no"];
+
+	}
+
+	constructor(app: App, note: string, placeholder: string | null, getItemsFun: () => string[], callback: (e: string) => void) {
+		super(app);
+		this.app = app;
+		this.setPlaceholder((placeholder ?? "y/n) ") + note);
+		if (getItemsFun) this.getItemsFun = getItemsFun;
+		this.callback = callback;
+	}
+
+	getItems(): string[] {
+		return this.getItemsFun();
+	}
+
+	getItemText(item: string): string {
+		return item;
+	}
+
+	onChooseItem(item: string, evt: MouseEvent | KeyboardEvent): void {
+		// debugger;
+		this.callback(item);
+		this.callback = null;
+	}
+	onClose(): void {
+		setTimeout(() => {
+			if (this.callback != null) {
+				this.callback("");
+			}
+		}, 100);
+	}
+}
+
+export const askSelectString = (app: App, message: string, items: string[]): Promise<string> => {
+	const getItemsFun = () => items;
+	return new Promise((res) => {
+		const popover = new PopoverSelectString(app, message, "", getItemsFun, (result) => res(result));
+		popover.open();
+	});
+};
