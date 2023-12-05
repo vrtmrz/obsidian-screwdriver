@@ -14,12 +14,13 @@ Note: Since v0.0.7, We can use properties to control this plug-in!
 ### How to use
 
 #### Install
-Install this plugin via [BRAT](https://github.com/TfTHacker/obsidian42-brat).
+You can install Screwdriver ... 
+- From Community Plugins
+- Via [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 
+#### Prepare a dump command file
 
-#### Prepare a file that to saving dump.
-
-As like this:
+The dump command file is the file which has some directions on the frontmatter; like the following.
 
 ```yaml
 targets:
@@ -35,8 +36,15 @@ filters:
 comment: "'Add target directory' to add targets"
 tags: []
 ```
-Don't worry. You can make this file by `Ctrl+P` -> `Screwdriver: Create dump template` in an empty file.
-All you have to do is pick the target directory by `Ctrl+P` -> `Screwdriver: Add target directory`.
+However, we do not have to worry so much. We can make this file by `Ctrl+P` -> `Screwdriver: Create dump template` on the empty file.
+
+Then, all we have to do is simply pick the target directory, by `Ctrl+P` -> `Screwdriver: Add target directory`. (For plugins).
+
+For other things, please change the `filters` and `ignores`.
+- `Ignores`: files beginning with the letter set here will be omitted while dumping.
+- `Filters`: only the files that match with the expression set here will be dumped.
+
+Note: If `URLs` have been supplied, we can retrieve the files from the internet. It may be useful for fetching CSS Snippets from Gist.
 
 #### Dump
 
