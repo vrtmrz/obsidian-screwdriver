@@ -89,45 +89,58 @@ export default class ScrewDriverPlugin extends Plugin {
 					["node_modules", ".git"]
 				);
 				const selected = await askSelectString(this.app, "Select target directory", list);
+
 				if (selected) {
-					this.app.fileManager.processFrontMatter(view.file, fm => {
-						fm.targets = [...fm.targets ?? [], selected];
+					let filters = [] as string[];
+					if (selected.indexOf("plugins") !== -1) {
+						if (await askSelectString(this.app, "Do you want to include plugin's data?", ["yes", "no"]) == "yes") {
+							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$", "data\\.json$"];
+						} else {
+							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$"];
+						}
+					} else if (selected.indexOf("themes") !== -1) {
+						filters = ["manifest\\.json$", "theme\\.css$"];
+					} else if (selected.indexOf("snippets") !== -1) {
+						filters = (await getFiles(this.app, selected, [], [/\.css$/])).map(e => e.substring(selected.length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$");
+					}
+					this.app.fileManager.processFrontMatter(view.file, async fm => {
+						fm.targets = [...new Set([...fm.targets ?? [], selected])];
+						if (filters.length > 0) {
+							fm.filters = [...new Set([...(fm.filters ?? []), ...filters])]
+						}
 					})
 				}
 			}
 		});
 		this.addCommand({
-			id: "screwdriver-create-template",
-			name: "Create dump template",
+			id: "screwdriver-create-template-dump",
+			name: "Create or add local file exporting template",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				const data = view.data;
-				if (data.trim() != "") {
-					new Notice(
-						"Please clear the note once. This plugin write the template to this file"
-					);
-					return;
-				}
-				editor.setValue(`---
-targets: []
-urls: []
-ignores:
-  - "/node_modules"
-  - "/.git"
-filters:
-  - "main\\\\.js$"
-  - "manifest\\\\.json$"
-  - "styles\\\\.css$"
-comment: "'Add target directory' to add targets"
-tags: []
----
-
-`);
+				this.app.fileManager.processFrontMatter(view.file, fn => {
+					fn.targets = fn.targets ?? [];
+					fn.ignores = fn.ignores ?? ["/node_modules", "/.git"];
+					fn.filters = fn.filters ?? [];
+					fn.comment = fn.comment ?? "'Add target directory' to add targets";
+					fn.tags = fn.tags ?? [];
+				});
 			},
 		});
+		this.addCommand({
+			id: "screwdriver-create-template-fetch",
+			name: "Create or add remote file fetching template",
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				this.app.fileManager.processFrontMatter(view.file, fn => {
+					fn.urls = fn.urls ?? [];
+					fn.authorization = fn.authorization ?? "";
+					fn.tags = fn.tags ?? [];
+					fn.header_json = fn.header_json ?? "";
+				});
+			},
+		})
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: "screwdriver-dump",
-			name: "Dump or fetch files",
+			name: "Export specified files and store into the active file",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const data = view.data;
 				const bodyStartIndex = data.indexOf("\n---");
@@ -235,7 +248,7 @@ tags: []
 		});
 		this.addCommand({
 			id: "screwdriver-restore",
-			name: "Restore files",
+			name: "Restore exported files from the active file",
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				const data = view.data;
 				if (data.startsWith("---")) {
