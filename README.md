@@ -18,9 +18,9 @@ You can install Screwdriver ...
 - From Community Plugins
 - Via [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 
-#### Prepare a dump command file
+#### Prepare a command file
 
-The dump command file is the file which has some directions on the frontmatter; like the following.
+The command file is the file which has some directions on the frontmatter; like the following.
 
 ```yaml
 targets:
@@ -36,19 +36,24 @@ filters:
 comment: "'Add target directory' to add targets"
 tags: []
 ```
-However, we do not have to worry so much. We can make this file by `Ctrl+P` -> `Screwdriver: Create dump template` on the empty file.
+However, we do not have to worry so much. We can make this file by `Ctrl+P` -> `Screwdriver: Create or add local file exporting template`.
 
-Then, all we have to do is simply pick the target directory, by `Ctrl+P` -> `Screwdriver: Add target directory`. (For plugins).
+Then, all we have to do is simply pick the target directory, by `Ctrl+P` -> `Screwdriver: Add target directory`.  
+When we choose the Plug-in or Theme, filters will be supplied automatically. 
 
-For other things, please change the `filters` and `ignores`.
+If you want to control more detail, please change the `filters` and `ignores`.
 - `Ignores`: files beginning with the letter set here will be omitted while dumping.
 - `Filters`: only the files that match with the expression set here will be dumped.
 
-Note: If `URLs` have been supplied, we can retrieve the files from the internet. It may be useful for fetching CSS Snippets from Gist.
+If you want to export multiple things at once, please repeat the `Add target directory`
 
-#### Dump
+>[!TIP]
+>If we want to fetch the file on the Internet, we can use `Create or add remote file fetching template`. 
+>Using this template, we can retrieve the files from the internet. It may be useful for fetching CSS Snippets from Gist.
 
-`Ctrl+P` -> `Dump files` to dump files to note.
+#### Export files
+
+`Ctrl+P` -> `Export specified files and store into the active file` to export files into the activefile.
 
 ```yaml
 ---
@@ -78,11 +83,13 @@ if you want to view the source, please visit the github repository of this plugi
 */
 ```
 
-Note: Dumped files can be modifiable by editing the doc.
+>[!TIP]
+>Exported files can be modified by editing the doc.
 
 #### Restore
-`Ctrl+P` -> `Restore files` to restore files into your storage.
+`Ctrl+P` -> `Restore exported files from the active file` to restore files into your storage.
 
-Note: Wrote as the filename following \`\`\` or \`\`\`screwdriver:
+>[!IMPORTANT]
+>The files are written as the filename following \`\`\` or \`\`\`screwdriver:
 
 If you're using [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync) or [remotely-save](https://github.com/fyears/remotely-save), it could be useful to synchronize your configuration between devices.
