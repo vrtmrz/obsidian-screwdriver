@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, FuzzySuggestModal } from "obsidian";
-
+const DEFAULT_OBSIDIAN_DIR = ".obsidian";
 // Util functions
 async function getFiles(
 	app: App,
@@ -122,6 +122,9 @@ export default class ScrewDriverPlugin extends Plugin {
 					fn.filters = fn.filters ?? [];
 					fn.comment = fn.comment ?? "'Add target directory' to add targets";
 					fn.tags = fn.tags ?? [];
+					fn.adjustObsidianDir = fn.adjustObsidianDir ?? true;
+					fn.skipNewFile = fn.skipNewFile ?? false;
+					fn.skipOldFile = fn.skipOldFile ?? false;
 				});
 			},
 		});
@@ -134,6 +137,8 @@ export default class ScrewDriverPlugin extends Plugin {
 					fn.authorization = fn.authorization ?? "";
 					fn.tags = fn.tags ?? [];
 					fn.header_json = fn.header_json ?? "";
+					fn.skipNewFile = fn.skipNewFile ?? false;
+					fn.skipOldFile = fn.skipOldFile ?? false;
 				});
 			},
 		})
@@ -154,6 +159,7 @@ export default class ScrewDriverPlugin extends Plugin {
 				const target = yamlData.target ?? "";
 				let targets = (yamlData.targets ?? []) as string[];
 				if (target) targets = [...targets, target];
+				const adjustObsidianDir = yamlData.adjustObsidianDir ?? true;
 				targets = targets.map(e => e.trim()).filter(e => e != "");
 				const ignoresSrc = yamlData.ignores;
 				const ignores: string[] = Array.isArray(ignoresSrc)
@@ -176,7 +182,6 @@ export default class ScrewDriverPlugin extends Plugin {
 						const w = await requestUrl(url);
 						const filename = new URL(url).pathname.split("/").last();
 						const dt = w.arrayBuffer;
-
 						try {
 							const text = new TextDecoder("utf-8", { fatal: true }).decode(dt);
 							fileDat = text;
@@ -195,8 +200,8 @@ export default class ScrewDriverPlugin extends Plugin {
 					} catch (ex) {
 						new Notice(`Error on fetching ${url}\n${ex}`);
 					}
-
 				}
+
 				for (const target of targets) {
 					const files = await getFiles(
 						this.app,
@@ -226,10 +231,12 @@ export default class ScrewDriverPlugin extends Plugin {
 						newData += `- Modified:${new Date(
 							stat.mtime
 						).toLocaleString()} \n`;
-						newData += "\n```screwdriver:" + file + ":" + (bin ? "bin" : "plain") + "\n";
+						const writeFileName = (adjustObsidianDir && file.startsWith(this.app.vault.configDir))
+							? DEFAULT_OBSIDIAN_DIR + file.substring(this.app.vault.configDir.length) : file;
+						newData += "\n```screwdriver:" + writeFileName + ":" + (bin ? "bin" : "plain") + ":" + stat.mtime + "\n";
 						newData += fileDat + "";
 						newData += "\n```";
-
+						new Notice(`File:${file} has been stored into the active file.`);
 					}
 				}
 				editor.setValue(newData);
@@ -243,7 +250,7 @@ export default class ScrewDriverPlugin extends Plugin {
 			const rSource = `${"```\n"}${source}${"\n```"}`;
 			const renderSource = `> [!screwdriver]- ${filename}\n${rSource.replace(/^/mg, "> ")}`;
 			const fx = el.createDiv({ text: "", cls: ["screwdriver-display"] });
-			MarkdownRenderer.renderMarkdown(renderSource, fx, sourcePath, this)
+			MarkdownRenderer.render(this.app, renderSource, fx, sourcePath, this);
 			el.replaceWith(fx);
 		});
 		this.addCommand({
@@ -253,16 +260,39 @@ export default class ScrewDriverPlugin extends Plugin {
 				const data = view.data;
 				if (data.startsWith("---")) {
 					const bodyStartIndex = data.indexOf("\n---");
-
+					const yaml = data.substring(3, bodyStartIndex);
+					const yamlData = parseYaml(yaml);
+					const adjustObsidianDir = yamlData.adjustObsidianDir ?? true;
+					const skipNewFile = yamlData.skipNewFile ?? false;
+					const skipOldFile = yamlData.skipOldFile ?? false;
 					if (bodyStartIndex !== -1) {
 						const preBlocks = data
 							.substring(bodyStartIndex)
 							.matchAll(/^```(?:screwdriver:|)([\s\S]*?)\n([\s\S]*?)^```/gm);
 						for (const preBlock of preBlocks) {
 							const [, filenameSrc, data] = preBlock;
-							const [filename, dataType] = `${filenameSrc}:`.split(":");
+							const [filenameData, dataType, mtimeStr] = `${filenameSrc}:`.split(":");
+							const filename =
+								(adjustObsidianDir && filenameData.startsWith(DEFAULT_OBSIDIAN_DIR + "/"))
+									? filenameData.replace(DEFAULT_OBSIDIAN_DIR, this.app.vault.configDir)
+									: filenameData;
+
 							let saveData = data;
 							try {
+								const mtime = parseInt(mtimeStr);
+								const stat = await this.app.vault.adapter.stat(filename);
+								if (stat !== null) {
+									if (skipOldFile && mtime < stat.mtime) {
+										new Notice(`File:${filename} is already up to date.`);
+										console.log(`File:${filename} is already up to date.`)
+										continue;
+									}
+									if (skipNewFile && mtime >= stat.mtime) {
+										new Notice(`File:${filename} already exists.`);
+										console.log(`File:${filename} already exists.`)
+										continue;
+									}
+								}
 								if ((isPlainText(filename) && dataType != "bin") || dataType == "plain") {
 									saveData = saveData.replace(/\\`/g, "`");
 									saveData = saveData.replace(/\\\\/g, "\\");
