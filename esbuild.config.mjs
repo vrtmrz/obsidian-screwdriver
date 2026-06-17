@@ -1,6 +1,6 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from 'builtin-modules'
+import { builtinModules } from "module";
 
 const banner =
 `/*
@@ -41,9 +41,9 @@ const context = await esbuild.context({
 		'@codemirror/text',
 		'@codemirror/tooltip',
 		'@codemirror/view',
-		...builtins],
+		...builtinModules],
 	format: 'cjs',
-	target: 'es2016',
+	target: 'es2020',
 	logLevel: "info",
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,

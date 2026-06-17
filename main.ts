@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, FuzzySuggestModal } from "obsidian";
+import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, FuzzySuggestModal, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
+// eslint-disable-next-line obsidianmd/hardcoded-config-path -- This is not actually used. used as an pseudo name.
 const DEFAULT_OBSIDIAN_DIR = ".obsidian";
 // Util functions
 async function getFiles(
@@ -65,11 +66,10 @@ async function ensureDirectory(app: App, fullpath: string) {
 			await app.vault.createFolder(c);
 		} catch (ex) {
 			// basically skip exceptions.
-			if (ex.message && ex.message == "Folder already exists.") {
-				// especialy this message is.
+			if (ex instanceof Error && ex.message == "Folder already exists.") {
+				// especially this message is.
 			} else {
 				new Notice("Folder Create Error");
-				console.log(ex);
 			}
 		}
 		c += "/";
@@ -77,12 +77,12 @@ async function ensureDirectory(app: App, fullpath: string) {
 }
 
 export default class ScrewDriverPlugin extends Plugin {
-	async onload() {
-		await this.loadSettings();
+	onload() {
+		void this.loadSettings();
 		this.addCommand({
 			id: "screwdriver-add-target-dir",
 			name: "Add target directory",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
+			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				const list = await getDirectories(
 					this.app,
 					this.app.vault.configDir,
@@ -103,7 +103,11 @@ export default class ScrewDriverPlugin extends Plugin {
 					} else if (selected.indexOf("snippets") !== -1) {
 						filters = (await getFiles(this.app, selected, [], [/\.css$/])).map(e => e.substring(selected.length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$");
 					}
-					this.app.fileManager.processFrontMatter(view.file, async fm => {
+					if (!(view.file instanceof TFile)) {
+						new Notice("Current file is not a valid file.");
+						return;
+					}
+					void this.app.fileManager.processFrontMatter(view.file, fm => {
 						fm.targets = [...new Set([...fm.targets ?? [], selected])];
 						if (filters.length > 0) {
 							fm.filters = [...new Set([...(fm.filters ?? []), ...filters])]
@@ -115,8 +119,12 @@ export default class ScrewDriverPlugin extends Plugin {
 		this.addCommand({
 			id: "screwdriver-create-template-dump",
 			name: "Create or add local file exporting template",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				this.app.fileManager.processFrontMatter(view.file, fn => {
+			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				if (!(view.file instanceof TFile)) {
+					new Notice("Current file is not a valid file.");
+					return;
+				}
+				void this.app.fileManager.processFrontMatter(view.file, fn => {
 					fn.targets = fn.targets ?? [];
 					fn.ignores = fn.ignores ?? ["/node_modules", "/.git"];
 					fn.filters = fn.filters ?? [];
@@ -131,8 +139,12 @@ export default class ScrewDriverPlugin extends Plugin {
 		this.addCommand({
 			id: "screwdriver-create-template-fetch",
 			name: "Create or add remote file fetching template",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				this.app.fileManager.processFrontMatter(view.file, fn => {
+			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				if (!(view.file instanceof TFile)) {
+					new Notice("Current file is not a valid file.");
+					return;
+				}
+				void this.app.fileManager.processFrontMatter(view.file, fn => {
 					fn.urls = fn.urls ?? [];
 					fn.authorization = fn.authorization ?? "";
 					fn.tags = fn.tags ?? [];
@@ -146,7 +158,11 @@ export default class ScrewDriverPlugin extends Plugin {
 		this.addCommand({
 			id: "screwdriver-dump",
 			name: "Export specified files and store into the active file",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
+			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				if (!("data" in view) || typeof view.data !== "string") {
+					new Notice("Current file is not a valid file.");
+					return;
+				}
 				const data = view.data;
 				const bodyStartIndex = data.indexOf("\n---");
 				if (!data.startsWith("---") || bodyStartIndex === -1) {
@@ -187,8 +203,8 @@ export default class ScrewDriverPlugin extends Plugin {
 							fileDat = text;
 							fileDat = fileDat.replace(/\\/g, "\\\\");
 							fileDat = fileDat.replace(/`/g, "\\`");
-						} catch (ex2) {
-							fileDat = await arrayBufferToBase64(dt);
+						} catch {
+							fileDat = arrayBufferToBase64(dt);
 							bin = true;
 						}
 						newData += "\n";
@@ -214,13 +230,17 @@ export default class ScrewDriverPlugin extends Plugin {
 						let bin = false;
 						const dt = await this.app.vault.adapter.readBinary(file);
 						const stat = await this.app.vault.adapter.stat(file);
+						if (stat == null) {
+							new Notice(`File can not be accessed: ${file}`);
+							continue;
+						}
 						try {
 							const text = new TextDecoder("utf-8", { fatal: true }).decode(dt);
 							fileDat = text;
 							fileDat = fileDat.replace(/\\/g, "\\\\");
 							fileDat = fileDat.replace(/`/g, "\\`");
-						} catch (ex2) {
-							fileDat = await arrayBufferToBase64(dt);
+						} catch {
+							fileDat = arrayBufferToBase64(dt);
 							bin = true;
 						}
 						newData += "\n";
@@ -245,18 +265,29 @@ export default class ScrewDriverPlugin extends Plugin {
 		this.registerMarkdownCodeBlockProcessor("screwdriver", (source, el, ctx) => {
 			const sourcePath = ctx.sourcePath;
 			const si = ctx.getSectionInfo(el);
-			const fxx = si.text.split("\n")[si.lineStart];
-			const filename = `${fxx}:::`.split(":")[1];
-			const rSource = `${"```\n"}${source}${"\n```"}`;
-			const renderSource = `> [!screwdriver]- ${filename}\n${rSource.replace(/^/mg, "> ")}`;
-			const fx = el.createDiv({ text: "", cls: ["screwdriver-display"] });
-			MarkdownRenderer.render(this.app, renderSource, fx, sourcePath, this);
-			el.replaceWith(fx);
+			if (si) {
+				const fxx = si.text.split("\n")[si.lineStart];
+				const filename = `${fxx}:::`.split(":")[1];
+				const rSource = `${"```\n"}${source}${"\n```"}`;
+				const renderSource = `> [!screwdriver]- ${filename}\n${rSource.replace(/^/mg, "> ")}`;
+				const fx = el.createDiv({ text: "", cls: ["screwdriver-display"] });
+				const component = new MarkdownRenderChild(fx);
+				ctx.addChild(component);
+				void MarkdownRenderer.render(this.app, renderSource, fx, sourcePath, component).then(() => {
+					;
+					el.replaceWith(fx);
+				});
+			}
 		});
 		this.addCommand({
 			id: "screwdriver-restore",
 			name: "Restore exported files from the active file",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
+			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				if (!("data" in view) || typeof view.data !== "string") {
+					new Notice("Current file is not a valid file.");
+					return;
+				}
+
 				const data = view.data;
 				if (data.startsWith("---")) {
 					const bodyStartIndex = data.indexOf("\n---");
@@ -284,12 +315,10 @@ export default class ScrewDriverPlugin extends Plugin {
 								if (stat !== null) {
 									if (skipOldFile && mtime < stat.mtime) {
 										new Notice(`File:${filename} is already up to date.`);
-										console.log(`File:${filename} is already up to date.`)
 										continue;
 									}
 									if (skipNewFile && mtime >= stat.mtime) {
 										new Notice(`File:${filename} already exists.`);
-										console.log(`File:${filename} already exists.`)
 										continue;
 									}
 								}
@@ -321,18 +350,14 @@ export default class ScrewDriverPlugin extends Plugin {
 								new Notice(
 									`File:${filename} has been wrote to your device.`
 								);
-								console.log(`File:${filename} has been wrote to your device.`)
-							} catch (ex) {
+							} catch {
 								new Notice(`Failed to write ${filename}`);
-								console.error(`Failed to write ${filename}`)
-								console.log(ex);
 							}
 						}
 						return;
 					}
 				}
 				new Notice("Frontmatter was not found.");
-				console.error("Frontmatter was not found")
 			},
 		});
 	}
@@ -347,7 +372,7 @@ export default class ScrewDriverPlugin extends Plugin {
 
 export class PopoverSelectString extends FuzzySuggestModal<string> {
 	app: App;
-	callback: (e: string) => void = () => { };
+	callback?: ((e: string) => void) = () => { };
 	getItemsFun: () => string[] = () => {
 		return ["yes", "no"];
 
@@ -369,14 +394,17 @@ export class PopoverSelectString extends FuzzySuggestModal<string> {
 		return item;
 	}
 
-	onChooseItem(item: string, evt: MouseEvent | KeyboardEvent): void {
+	onChooseItem(item: string, _evt: MouseEvent | KeyboardEvent): void {
 		// debugger;
-		this.callback(item);
-		this.callback = null;
+		if (this.callback) {
+			this.callback(item);
+			this.callback = undefined;
+		}
 	}
 	onClose(): void {
-		setTimeout(() => {
-			if (this.callback != null) {
+		// eslint-disable-next-line obsidianmd/prefer-window-timers
+		activeWindow.setTimeout(() => {
+			if (this.callback != undefined) {
 				this.callback("");
 			}
 		}, 100);
