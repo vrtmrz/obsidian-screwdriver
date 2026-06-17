@@ -214,7 +214,7 @@ export default class ScrewDriverPlugin extends Plugin {
 						newData += fileDat + "";
 						newData += "\n```";
 					} catch (ex) {
-						new Notice(`Error on fetching ${url}\n${ex}`);
+						new Notice(`Error on fetching ${url}\n${ex instanceof Error ? ex.message : String(ex)}`);
 					}
 				}
 

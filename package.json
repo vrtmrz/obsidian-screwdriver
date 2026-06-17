@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-screwdriver",
-	"version": "0.0.9",
+	"version": "0.0.10",
 	"description": "Utility to put any files in and out under your vault.",
 	"main": "main.js",
 	"scripts": {
