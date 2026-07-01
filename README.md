@@ -1,32 +1,49 @@
 ## Screwdriver
 
-The plugin for picking and putting hidden files.
+Screwdriver exports files from inside your vault into a Markdown note, and restores those files from that note later.
 
 ![screenshot](https://user-images.githubusercontent.com/45774780/158567788-fbea41ba-d07d-4faf-bc09-ce241a0c9f67.gif)
 
-You can dump your files which are stored in the specified directory, or put dumped files into any path under your vault.
+It is useful for moving or synchronising files that normal Markdown synchronisation workflows may not handle well, such as plug-in files, theme files, CSS snippets, or hidden files under `.obsidian`.
 
+Since v0.0.7, Screwdriver can be controlled from note properties.
 
-Note: Since v0.0.7, We can use properties to control this plug-in!
 ![screenshot2](https://github.com/vrtmrz/obsidian-screwdriver/assets/45774780/7c9b2a08-e3d2-498a-8678-60e009fcb6e1)
 
 ## Features
-- Dump files from the specified directory with filters and ignores.
-- Put dumped files into any path under your vault (including the hidden directory).
 
->[!IMPORTANT]
-Please note that the output of this plug-in is a markdown file, but very large.  Make sure to set to be ignored by your other plug-ins. i.e., `Templater` or `DataView`.
+- Export files from selected folders into the current note.
+- Fetch remote files into the current note.
+- Restore exported files back into your vault.
+- Filter or ignore files while exporting.
+- Restore files under hidden folders such as `.obsidian`.
 
-### How to use
+> [!IMPORTANT]
+> Screwdriver stores exported files inside a Markdown note. The note can become very large. Consider excluding Screwdriver notes from plug-ins that scan Markdown content heavily, such as Templater or Dataview.
 
-#### Install
-You can install Screwdriver in the following ways: 
+## How to use
+
+### Install
+
+You can install Screwdriver in either of these ways:
+
 - From Community Plugins
-- Via [BRAT](https://github.com/TfTHacker/obsidian42-brat).
+- Via [BRAT](https://github.com/TfTHacker/obsidian42-brat)
 
-#### Prepare a command file
+### Basic local export workflow
 
-The command file is the file which has some directions on the frontmatter; like the following.
+Use these commands from the command palette:
+
+1. `Screwdriver: Create local export note`
+2. `Screwdriver: Add folder to this export note`
+3. `Screwdriver: Export files into this note`
+4. On another device or vault, run `Screwdriver: Restore files from this note`
+
+The first command creates the required properties on the active note. The second command adds a folder to the `targets` property. The third command reads those properties and embeds the matching files into the note body.
+
+### Screwdriver note properties
+
+A Screwdriver note for local exports uses properties like this:
 
 ```yaml
 targets:
@@ -39,32 +56,62 @@ filters:
   - main\.js$
   - manifest\.json$
   - styles\.css$
-comment: "'Add target directory' to add targets"
+comment: "Use 'Add folder to this export note' to add targets"
 tags: []
 adjustObsidianDir: true
 skipNewFile: false
 skipOldFile: false
 ```
-However, we do not have to worry so much. We can make this file by `Ctrl+P` -> `Screwdriver: Create or add local file exporting template`.
 
-Then, all we have to do is simply pick the target directory, by `Ctrl+P` -> `Screwdriver: Add target directory`.  
-When we choose the Plug-in or Theme, filters will be supplied automatically. 
+You usually do not need to write this by hand. Run `Screwdriver: Create local export note` on an empty note, then run `Screwdriver: Add folder to this export note`.
 
-If you want to control more detail, please change the `filters` and `ignores`.
-- `Ignores`: files beginning with the letter set here will be omitted while dumping.
-- `Filters`: only the files that match with the expression set here will be dumped.
+When you choose a plug-in or theme folder, Screwdriver adds common filters automatically:
 
-If you want to export multiple things at once, please repeat the `Add target directory`
+- Plug-ins: `main.js`, `manifest.json`, `styles.css`
+- Themes: `manifest.json`, `theme.css`
+- CSS snippets: selected `.css` files
 
->[!TIP]
->If we want to fetch the file on the Internet, we can use `Create or add remote file fetching template`. 
->Using this template, we can retrieve the files from the internet. It may be useful for fetching CSS Snippets from Gist.
+You can edit these properties manually if needed:
 
-#### Export files
+- `targets`: folders to export from
+- `urls`: remote files to fetch
+- `ignores`: paths to skip while exporting
+- `filters`: regular expressions for files to include
+- `adjustObsidianDir`: store the Obsidian config folder as `.obsidian` so the note can be restored across vaults
+- `skipNewFile`: do not overwrite an existing file with a newer exported copy
+- `skipOldFile`: do not overwrite an existing file with an older exported copy
 
-`Ctrl+P` -> `Export specified files and store into the active file` to export files into the activefile.
+To export several folders into the same note, run `Screwdriver: Add folder to this export note` more than once.
 
-```yaml
+### Fetch remote files
+
+To create a note for remote files, run:
+
+```text
+Screwdriver: Create remote fetch note
+```
+
+Then add URLs to the `urls` property and run:
+
+```text
+Screwdriver: Export files into this note
+```
+
+This is useful for storing CSS snippets or other small text assets from remote sources.
+
+### Export files
+
+Run:
+
+```text
+Screwdriver: Export files into this note
+```
+
+Screwdriver keeps the note properties and appends exported files to the note body.
+
+Example output:
+
+````md
 ---
 targets:
   - .obsidian/plugins/tagfolder
@@ -76,32 +123,39 @@ filters:
   - main\.js$
   - manifest\.json$
   - styles\.css$
-comment: "'Add target directory' to add targets"
+comment: "Use 'Add folder to this export note' to add targets"
 tags: []
 adjustObsidianDir: true
 skipNewFile: false
 skipOldFile: false
 ---
-```
-```md
-# .obsidian/plugins/tagfolder/main.js 
-- Created :2023/7/12 9:28:27 
-- Modified:2023/8/25 17:52:29 
+
+# .obsidian/plugins/tagfolder/main.js
+- Created :2023/7/12 9:28:27
+- Modified:2023/8/25 17:52:29
 
 ```screwdriver:.obsidian/plugins/tagfolder/main.js:plain:1692953549000
 /*
 THIS IS A GENERATED/BUNDLED FILE BY ESBUILD
-if you want to view the source, please visit the github repository of this plugin
+if you want to view the source, please visit the github repository of this plug-in
 */
 ```
+````
 
->[!TIP]
->Exported files can be modified by editing the doc.
+> [!TIP]
+> You can edit exported text files directly in the note before restoring them.
 
-#### Restore
-`Ctrl+P` -> `Restore exported files from the active file` to restore files into your storage.
+### Restore files
 
->[!IMPORTANT]
->The files are written as the filename following \`\`\` or \`\`\`screwdriver:
+Run:
 
-If you're using [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync) or [remotely-save](https://github.com/fyears/remotely-save), it could be useful to synchronize your configuration between devices.
+```text
+Screwdriver: Restore files from this note
+```
+
+Screwdriver restores files from fenced code blocks whose opening line starts with ```` ```screwdriver: ````. It also supports compatible fenced blocks that contain a filename after the opening backticks.
+
+> [!IMPORTANT]
+> Restore only from notes you trust. Screwdriver writes files to paths recorded in the note.
+
+Screwdriver can be useful with [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync) or [remotely-save](https://github.com/fyears/remotely-save) when you want to sync configuration files between devices.

@@ -81,7 +81,7 @@ export default class ScrewDriverPlugin extends Plugin {
 		void this.loadSettings();
 		this.addCommand({
 			id: "screwdriver-add-target-dir",
-			name: "Add target directory",
+			name: "Add folder to this export note",
 			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				const list = await getDirectories(
 					this.app,
@@ -93,7 +93,7 @@ export default class ScrewDriverPlugin extends Plugin {
 				if (selected) {
 					let filters = [] as string[];
 					if (selected.indexOf("plugins") !== -1) {
-						if (await askSelectString(this.app, "Do you want to include plugin's data?", ["yes", "no"]) == "yes") {
+						if (await askSelectString(this.app, "Do you want to include plug-in data?", ["yes", "no"]) == "yes") {
 							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$", "data\\.json$"];
 						} else {
 							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$"];
@@ -118,7 +118,7 @@ export default class ScrewDriverPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "screwdriver-create-template-dump",
-			name: "Create or add local file exporting template",
+			name: "Create local export note",
 			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!(view.file instanceof TFile)) {
 					new Notice("Current file is not a valid file.");
@@ -128,7 +128,7 @@ export default class ScrewDriverPlugin extends Plugin {
 					fn.targets = fn.targets ?? [];
 					fn.ignores = fn.ignores ?? ["/node_modules", "/.git"];
 					fn.filters = fn.filters ?? [];
-					fn.comment = fn.comment ?? "'Add target directory' to add targets";
+					fn.comment = fn.comment ?? "Use 'Add folder to this export note' to add targets";
 					fn.tags = fn.tags ?? [];
 					fn.adjustObsidianDir = fn.adjustObsidianDir ?? true;
 					fn.skipNewFile = fn.skipNewFile ?? false;
@@ -138,7 +138,7 @@ export default class ScrewDriverPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "screwdriver-create-template-fetch",
-			name: "Create or add remote file fetching template",
+			name: "Create remote fetch note",
 			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!(view.file instanceof TFile)) {
 					new Notice("Current file is not a valid file.");
@@ -157,7 +157,7 @@ export default class ScrewDriverPlugin extends Plugin {
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: "screwdriver-dump",
-			name: "Export specified files and store into the active file",
+			name: "Export files into this note",
 			editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!("data" in view) || typeof view.data !== "string") {
 					new Notice("Current file is not a valid file.");
@@ -281,7 +281,7 @@ export default class ScrewDriverPlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "screwdriver-restore",
-			name: "Restore exported files from the active file",
+			name: "Restore files from this note",
 			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!("data" in view) || typeof view.data !== "string") {
 					new Notice("Current file is not a valid file.");
