@@ -17,7 +17,13 @@ export interface ScrewDriverTestSession {
 	readonly vault: TemporaryVault;
 }
 
-export async function startScrewDriverTestSession(): Promise<ScrewDriverTestSession> {
+export interface StartScrewDriverTestSessionOptions {
+	readonly prepareVault?: (vault: TemporaryVault) => Promise<void>;
+}
+
+export async function startScrewDriverTestSession(
+	options: StartScrewDriverTestSessionOptions = {},
+): Promise<ScrewDriverTestSession> {
 	const cli = discoverObsidianCli();
 	if (!cli.binary) throw new Error(`Could not find obsidian-cli. Checked: ${cli.checked.join(", ")}`);
 	const vault = await createTemporaryVault({
@@ -27,6 +33,7 @@ export async function startScrewDriverTestSession(): Promise<ScrewDriverTestSess
 	});
 	try {
 		await writeFile(join(vault.path, EXPORT_NOTE_PATH), "---\ntargets: []\nfilters: []\n---\n", "utf8");
+		await options.prepareVault?.(vault);
 		const session = await startObsidianPluginSession({
 			binary: requireObsidianBinary(),
 			cliBinary: cli.binary,

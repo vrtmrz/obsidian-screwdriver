@@ -158,4 +158,6 @@ Screwdriver restores files from fenced code blocks whose opening line starts wit
 > [!IMPORTANT]
 > Restore only from notes you trust. Screwdriver writes files to paths recorded in the note.
 
+Restore paths must be canonical, portable Vault-relative paths using `/` separators. Screwdriver skips absolute paths, parent traversal, backslashes, empty path components, control characters, and names that are invalid or reserved on common desktop platforms. When `adjustObsidianDir` is enabled, the portable `.obsidian/` prefix is validated and mapped below the active Vault configuration directory.
+
 Screwdriver can be useful with [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync) or [remotely-save](https://github.com/fyears/remotely-save) when you want to sync configuration files between devices.
