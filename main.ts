@@ -1,4 +1,6 @@
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, FuzzySuggestModal, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
+import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
+import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
+import { chooseTargetDirectory, shouldIncludePluginData } from "./ui-workflow";
 // eslint-disable-next-line obsidianmd/hardcoded-config-path -- This is not actually used. used as an pseudo name.
 const DEFAULT_OBSIDIAN_DIR = ".obsidian";
 // Util functions
@@ -77,7 +79,10 @@ async function ensureDirectory(app: App, fullpath: string) {
 }
 
 export default class ScrewDriverPlugin extends Plugin {
+	ui!: UiInteractions;
+
 	onload() {
+		this.ui = createObsidianUi(this.app);
 		void this.loadSettings();
 		this.addCommand({
 			id: "screwdriver-add-target-dir",
@@ -88,12 +93,12 @@ export default class ScrewDriverPlugin extends Plugin {
 					this.app.vault.configDir,
 					["node_modules", ".git"]
 				);
-				const selected = await askSelectString(this.app, "Select target directory", list);
+				const selected = await chooseTargetDirectory(this.ui, list);
 
 				if (selected) {
 					let filters = [] as string[];
 					if (selected.indexOf("plugins") !== -1) {
-						if (await askSelectString(this.app, "Do you want to include plug-in data?", ["yes", "no"]) == "yes") {
+						if (await shouldIncludePluginData(this.ui)) {
 							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$", "data\\.json$"];
 						} else {
 							filters = ["main\\.js$", "manifest\\.json$", "styles\\.css$"];
@@ -368,53 +373,3 @@ export default class ScrewDriverPlugin extends Plugin {
 
 	async saveSettings() { }
 }
-
-
-export class PopoverSelectString extends FuzzySuggestModal<string> {
-	app: App;
-	callback?: ((e: string) => void) = () => { };
-	getItemsFun: () => string[] = () => {
-		return ["yes", "no"];
-
-	}
-
-	constructor(app: App, note: string, placeholder: string | null, getItemsFun: () => string[], callback: (e: string) => void) {
-		super(app);
-		this.app = app;
-		this.setPlaceholder((placeholder ?? "y/n) ") + note);
-		if (getItemsFun) this.getItemsFun = getItemsFun;
-		this.callback = callback;
-	}
-
-	getItems(): string[] {
-		return this.getItemsFun();
-	}
-
-	getItemText(item: string): string {
-		return item;
-	}
-
-	onChooseItem(item: string, _evt: MouseEvent | KeyboardEvent): void {
-		// debugger;
-		if (this.callback) {
-			this.callback(item);
-			this.callback = undefined;
-		}
-	}
-	onClose(): void {
-		// eslint-disable-next-line obsidianmd/prefer-window-timers
-		activeWindow.setTimeout(() => {
-			if (this.callback != undefined) {
-				this.callback("");
-			}
-		}, 100);
-	}
-}
-
-export const askSelectString = (app: App, message: string, items: string[]): Promise<string> => {
-	const getItemsFun = () => items;
-	return new Promise((res) => {
-		const popover = new PopoverSelectString(app, message, "", getItemsFun, (result) => res(result));
-		popover.open();
-	});
-};
