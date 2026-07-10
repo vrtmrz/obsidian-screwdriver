@@ -1,8 +1,8 @@
 import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
+import { UnsafePathError } from "octagonal-wheels/path";
 import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
+import { PORTABLE_OBSIDIAN_CONFIG_DIR, resolveRestorePath } from "./restore-path";
 import { chooseTargetDirectory, shouldIncludePluginData } from "./ui-workflow";
-// eslint-disable-next-line obsidianmd/hardcoded-config-path -- This is not actually used. used as an pseudo name.
-const DEFAULT_OBSIDIAN_DIR = ".obsidian";
 // Util functions
 async function getFiles(
 	app: App,
@@ -257,7 +257,7 @@ export default class ScrewDriverPlugin extends Plugin {
 							stat.mtime
 						).toLocaleString()} \n`;
 						const writeFileName = (adjustObsidianDir && file.startsWith(this.app.vault.configDir))
-							? DEFAULT_OBSIDIAN_DIR + file.substring(this.app.vault.configDir.length) : file;
+							? PORTABLE_OBSIDIAN_CONFIG_DIR + file.substring(this.app.vault.configDir.length) : file;
 						newData += "\n```screwdriver:" + writeFileName + ":" + (bin ? "bin" : "plain") + ":" + stat.mtime + "\n";
 						newData += fileDat + "";
 						newData += "\n```";
@@ -308,10 +308,18 @@ export default class ScrewDriverPlugin extends Plugin {
 						for (const preBlock of preBlocks) {
 							const [, filenameSrc, data] = preBlock;
 							const [filenameData, dataType, mtimeStr] = `${filenameSrc}:`.split(":");
-							const filename =
-								(adjustObsidianDir && filenameData.startsWith(DEFAULT_OBSIDIAN_DIR + "/"))
-									? filenameData.replace(DEFAULT_OBSIDIAN_DIR, this.app.vault.configDir)
-									: filenameData;
+							let filename: string;
+							try {
+								filename = resolveRestorePath({
+									storedPath: filenameData,
+									configDir: this.app.vault.configDir,
+									adjustObsidianDir,
+								});
+							} catch (error) {
+								if (!(error instanceof UnsafePathError)) throw error;
+								new Notice(`Skipped unsafe restore path ${JSON.stringify(error.input)} (${error.reason}).`);
+								continue;
+							}
 
 							let saveData = data;
 							try {

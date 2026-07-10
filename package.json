@@ -12,6 +12,7 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:e2e:obsidian:add-target": "npm run build && tsx test/e2e-obsidian/add-target.mts",
+		"test:e2e:obsidian:restore-paths": "npm run build && tsx test/e2e-obsidian/restore-paths.mts",
 		"tsc-check": "tsc --noEmit --skipLibCheck"
 	},
 	"keywords": [],
@@ -36,6 +37,7 @@
 	},
 	"dependencies": {
 		"@vrtmrz/obsidian-plugin-kit": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-obsidian-plugin-kit-0.1.0.tgz",
-		"@vrtmrz/ui-interactions": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-ui-interactions-0.1.0.tgz"
+		"@vrtmrz/ui-interactions": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-ui-interactions-0.1.0.tgz",
+		"octagonal-wheels": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/octagonal-wheels-0.1.47-preview.0.tgz"
 	}
 }
