@@ -46,6 +46,14 @@ npm run test:e2e:obsidian:restore-paths
 
 Real-Obsidian E2E is currently validated on Linux only and is not part of the default CI gate.
 
+## Vault read boundary
+
+`vault-read.ts` defines the narrow, ScrewDriver-owned capabilities used by target discovery and dump capture: direct-child listing, binary reads, and metadata reads. The production composition supplies `app.vault.adapter`, which is already bound to the active Vault root. All paths passed to these helpers remain Vault-relative; the helpers do not select or discover a root.
+
+The App-free tests use structural fakes to verify recursive listing results, ignored-subtree behaviour, exact binary data, missing metadata, and deterministic adapter operation counts. These types are an internal consumer pilot, not a neutral Fancy Kit storage API.
+
+Restore writes and directory creation remain outside this boundary. Their overwrite, missing-path, error, and folder-creation semantics need comparison with another consumer before a shared contract is appropriate.
+
 ## Restore path boundary
 
 Paths parsed from fenced block headers are untrusted input. `restore-path.ts` uses `octagonal-wheels/path` to accept only canonical portable relative paths before any Vault adapter `stat`, directory creation, or write operation.

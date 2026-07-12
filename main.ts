@@ -3,44 +3,11 @@ import { UnsafePathError } from "octagonal-wheels/path";
 import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
 import { PORTABLE_OBSIDIAN_CONFIG_DIR, resolveRestorePath } from "./restore-path";
 import { chooseTargetDirectory, shouldIncludePluginData } from "./ui-workflow";
-// Util functions
-async function getFiles(
-	app: App,
-	path: string,
-	ignoreList: string[],
-	filter: RegExp[]
-) {
-	const w = await app.vault.adapter.list(path);
-	let files = [
-		...w.files
-			.filter((e) => !ignoreList.some((ee) => e.endsWith(ee)))
-			.filter((e) => !filter || filter.some((ee) => e.match(ee))),
-	];
-	L1: for (const v of w.folders) {
-		for (const ignore of ignoreList) {
-			if (v.endsWith(ignore)) {
-				continue L1;
-			}
-		}
-		// files = files.concat([v]);
-		files = files.concat(await getFiles(app, v, ignoreList, filter));
-	}
-	return files;
-}
-async function getDirectories(app: App, path: string, ignoreList: string[]) {
-	const w = await app.vault.adapter.list(path);
-	let dirs: string[] = [];
-	L1: for (const v of w.folders) {
-		for (const ignore of ignoreList) {
-			if (v.endsWith(ignore)) {
-				continue L1;
-			}
-		}
-		dirs = dirs.concat([v]);
-		dirs = dirs.concat(await getDirectories(app, v, ignoreList));
-	}
-	return dirs;
-}
+import {
+	listVaultDirectoriesRecursively,
+	listVaultFilesRecursively,
+	readVaultFileForDump,
+} from "./vault-read";
 
 function isPlainText(filename: string): boolean {
 	if (filename.endsWith(".md")) return true;
@@ -88,8 +55,8 @@ export default class ScrewDriverPlugin extends Plugin {
 			id: "screwdriver-add-target-dir",
 			name: "Add folder to this export note",
 			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-				const list = await getDirectories(
-					this.app,
+				const list = await listVaultDirectoriesRecursively(
+					this.app.vault.adapter,
 					this.app.vault.configDir,
 					["node_modules", ".git"]
 				);
@@ -106,7 +73,7 @@ export default class ScrewDriverPlugin extends Plugin {
 					} else if (selected.indexOf("themes") !== -1) {
 						filters = ["manifest\\.json$", "theme\\.css$"];
 					} else if (selected.indexOf("snippets") !== -1) {
-						filters = (await getFiles(this.app, selected, [], [/\.css$/])).map(e => e.substring(selected.length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$");
+						filters = (await listVaultFilesRecursively(this.app.vault.adapter, selected, [], [/\.css$/])).map(e => e.substring(selected.length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$");
 					}
 					if (!(view.file instanceof TFile)) {
 						new Notice("Current file is not a valid file.");
@@ -224,8 +191,8 @@ export default class ScrewDriverPlugin extends Plugin {
 				}
 
 				for (const target of targets) {
-					const files = await getFiles(
-						this.app,
+					const files = await listVaultFilesRecursively(
+						this.app.vault.adapter,
 						target,
 						ignores,
 						filters
@@ -233,12 +200,12 @@ export default class ScrewDriverPlugin extends Plugin {
 					for (const file of files) {
 						let fileDat = "";
 						let bin = false;
-						const dt = await this.app.vault.adapter.readBinary(file);
-						const stat = await this.app.vault.adapter.stat(file);
-						if (stat == null) {
+						const captured = await readVaultFileForDump(this.app.vault.adapter, file);
+						if (captured === null) {
 							new Notice(`File can not be accessed: ${file}`);
 							continue;
 						}
+						const { data: dt, stat } = captured;
 						try {
 							const text = new TextDecoder("utf-8", { fatal: true }).decode(dt);
 							fileDat = text;
