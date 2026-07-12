@@ -10,6 +10,8 @@ npm run check
 npm run build
 ```
 
+Pull requests and pushes to `main` run the same clean installation, repository check, production build, and local-only E2E script typecheck on GitHub Actions. CI does not download or launch Obsidian. Real Obsidian remains an explicit local validation because repeatedly acquiring and launching the desktop application is inappropriate for the default remote gate without a separate review of distribution traffic, caching, and runner support.
+
 ## UI boundary
 
 The plug-in owns one `UiInteractions` capability for its lifetime:
