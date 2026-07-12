@@ -30,9 +30,9 @@ const harness = createUiTestHarness([
 
 Scripted responses are instance-scoped. Call `assertDone()` so an expected interaction that did not occur fails the test. Closing the plug-in-data confirmation follows the safe exclude path.
 
-## Fancy Kit preview
+## Fancy Kit dependencies
 
-Until Fancy Kit is published to npm, its packages are pinned to immutable tarballs from one GitHub prerelease. Update all Fancy Kit package URLs used by the plug-in together when a migration needs a newer preview. The restore path boundary currently consumes the OW prerelease from the same preview tag.
+The Fancy Kit packages and `octagonal-wheels` are pinned to exact npm versions so the tested dependency set remains reproducible. Review and update the four versions together when adopting a newer contract. The restore path boundary currently consumes the path contract introduced in `octagonal-wheels@0.1.48`.
 
 The App-free tests verify workflow policy and the UI transcript. They do not replace real Obsidian coverage for modal rendering, keyboard handling, focus, or theme behaviour.
 

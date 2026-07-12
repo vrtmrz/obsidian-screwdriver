@@ -23,7 +23,7 @@
 		"@emnapi/runtime": "1.11.2",
 		"@types/node": "^22.15.3",
 		"@typescript-eslint/parser": "^8.31.1",
-		"@vrtmrz/obsidian-test-session": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-obsidian-test-session-0.1.0.tgz",
+		"@vrtmrz/obsidian-test-session": "0.1.0",
 		"esbuild": "0.28.1",
 		"eslint": "^9.25.1",
 		"eslint-plugin-obsidianmd": "^0.3.0",
@@ -36,8 +36,8 @@
 		"vitest": "^4.1.10"
 	},
 	"dependencies": {
-		"@vrtmrz/obsidian-plugin-kit": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-obsidian-plugin-kit-0.1.0.tgz",
-		"@vrtmrz/ui-interactions": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/vrtmrz-ui-interactions-0.1.0.tgz",
-		"octagonal-wheels": "https://github.com/vrtmrz/fancy-kit/releases/download/consumer-preview-2026-07-10.5/octagonal-wheels-0.1.47-preview.0.tgz"
+		"@vrtmrz/obsidian-plugin-kit": "0.1.0",
+		"@vrtmrz/ui-interactions": "0.1.0",
+		"octagonal-wheels": "0.1.48"
 	}
 }
