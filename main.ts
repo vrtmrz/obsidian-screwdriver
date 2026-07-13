@@ -1,9 +1,18 @@
 import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
+import {
+	createObsidianVaultFrontmatterAccess,
+	type VaultFrontmatterAccess,
+} from "@vrtmrz/obsidian-plugin-kit/vault";
 import { UnsafePathError } from "octagonal-wheels/path";
 import { Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
 import { PORTABLE_OBSIDIAN_CONFIG_DIR, resolveRestorePath } from "./restore-path";
 import { chooseTargetDirectory, shouldIncludePluginData } from "./ui-workflow";
 import { createObsidianVaultRestoreAccess, restoreVaultFile } from "./vault-restore";
+import {
+	addExportTarget,
+	initialiseLocalExportNote,
+	initialiseRemoteFetchNote,
+} from "./frontmatter-workflow";
 import {
 	listVaultDirectoriesRecursively,
 	listVaultFilesRecursively,
@@ -28,9 +37,11 @@ function isPlainText(filename: string): boolean {
 
 export default class ScrewDriverPlugin extends Plugin {
 	ui!: UiInteractions;
+	frontmatter!: VaultFrontmatterAccess;
 
 	onload() {
 		this.ui = createObsidianUi(this.app);
+		this.frontmatter = createObsidianVaultFrontmatterAccess(this.app);
 		void this.loadSettings();
 		this.addCommand({
 			id: "screwdriver-add-target-dir",
@@ -60,51 +71,30 @@ export default class ScrewDriverPlugin extends Plugin {
 						new Notice("Current file is not a valid file.");
 						return;
 					}
-					void this.app.fileManager.processFrontMatter(view.file, fm => {
-						fm.targets = [...new Set([...fm.targets ?? [], selected])];
-						if (filters.length > 0) {
-							fm.filters = [...new Set([...(fm.filters ?? []), ...filters])]
-						}
-					})
+					await addExportTarget(this.frontmatter, view.file.path, selected, filters);
 				}
 			}
 		});
 		this.addCommand({
 			id: "screwdriver-create-template-dump",
 			name: "Create local export note",
-			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!(view.file instanceof TFile)) {
 					new Notice("Current file is not a valid file.");
 					return;
 				}
-				void this.app.fileManager.processFrontMatter(view.file, fn => {
-					fn.targets = fn.targets ?? [];
-					fn.ignores = fn.ignores ?? ["/node_modules", "/.git"];
-					fn.filters = fn.filters ?? [];
-					fn.comment = fn.comment ?? "Use 'Add folder to this export note' to add targets";
-					fn.tags = fn.tags ?? [];
-					fn.adjustObsidianDir = fn.adjustObsidianDir ?? true;
-					fn.skipNewFile = fn.skipNewFile ?? false;
-					fn.skipOldFile = fn.skipOldFile ?? false;
-				});
+				await initialiseLocalExportNote(this.frontmatter, view.file.path);
 			},
 		});
 		this.addCommand({
 			id: "screwdriver-create-template-fetch",
 			name: "Create remote fetch note",
-			editorCallback: (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				if (!(view.file instanceof TFile)) {
 					new Notice("Current file is not a valid file.");
 					return;
 				}
-				void this.app.fileManager.processFrontMatter(view.file, fn => {
-					fn.urls = fn.urls ?? [];
-					fn.authorization = fn.authorization ?? "";
-					fn.tags = fn.tags ?? [];
-					fn.header_json = fn.header_json ?? "";
-					fn.skipNewFile = fn.skipNewFile ?? false;
-					fn.skipOldFile = fn.skipOldFile ?? false;
-				});
+				await initialiseRemoteFetchNote(this.frontmatter, view.file.path);
 			},
 		})
 		// This adds an editor command that can perform some operation on the current editor instance

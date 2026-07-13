@@ -48,6 +48,18 @@ npm run test:e2e:obsidian:restore-paths
 
 Real-Obsidian E2E is currently validated on Linux only and is not part of the default CI gate.
 
+## Vault frontmatter boundary
+
+The plug-in creates one path-based `VaultFrontmatterAccess` capability during loading:
+
+```ts
+this.frontmatter = createObsidianVaultFrontmatterAccess(this.app);
+```
+
+`frontmatter-workflow.ts` owns the policy for adding export targets and initialising local-export and remote-fetch note properties. The workflow accepts only `updateFrontmatter`, so App-free tests can use `createVaultFrontmatterTestHarness` to verify the before-and-after values and failure propagation without constructing an Obsidian `App` or `TFile`.
+
+The local real-Obsidian add-target scenario complements those policy tests by exercising Obsidian's frontmatter processor and verifying the persisted note properties.
+
 ## Vault read boundary
 
 `vault-read.ts` defines the narrow, ScrewDriver-owned capabilities used by target discovery and dump capture: direct-child listing, binary reads, and metadata reads. The production composition supplies `app.vault.adapter`, which is already bound to the active Vault root. All paths passed to these helpers remain Vault-relative; the helpers do not select or discover a root.
