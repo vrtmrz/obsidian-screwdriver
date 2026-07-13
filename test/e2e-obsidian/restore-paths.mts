@@ -83,7 +83,7 @@ async function verifyRestorePathBoundary(testSession: ScrewDriverTestSession): P
 				timeout: 10_000,
 			});
 			await page.waitForFunction(
-				async (safePath) => {
+				async (expectedPaths) => {
 					const obsidianApp = (
 						globalThis as typeof globalThis & {
 							app?: {
@@ -93,11 +93,17 @@ async function verifyRestorePathBoundary(testSession: ScrewDriverTestSession): P
 							};
 						}
 					).app;
-					return await obsidianApp?.vault?.adapter?.exists(safePath) === true;
+					const adapter = obsidianApp?.vault?.adapter;
+					if (!adapter) return false;
+					return (await Promise.all(expectedPaths.map((path) => adapter.exists(path))))
+						.every((exists) => exists);
 				},
-				SAFE_PATH,
+				[SAFE_PATH, SIBLING_PATH, BINARY_PATH],
 				{ timeout: 10_000 },
 			);
+			await page.locator(".notice")
+				.filter({ hasText: `File:${SKIPPED_PATH} is already up to date.` })
+				.waitFor({ state: "visible", timeout: 10_000 });
 		});
 
 		const safeContent = await readFile(join(testSession.vault.path, SAFE_PATH), "utf8");
