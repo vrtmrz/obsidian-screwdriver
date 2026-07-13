@@ -1,8 +1,9 @@
 import { createObsidianUi, type UiInteractions } from "@vrtmrz/obsidian-plugin-kit/ui";
 import { UnsafePathError } from "octagonal-wheels/path";
-import { App, Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
+import { Editor, MarkdownView, Notice, parseYaml, Plugin, requestUrl, arrayBufferToBase64, base64ToArrayBuffer, MarkdownRenderer, TFile, type MarkdownFileInfo, MarkdownRenderChild } from "obsidian";
 import { PORTABLE_OBSIDIAN_CONFIG_DIR, resolveRestorePath } from "./restore-path";
 import { chooseTargetDirectory, shouldIncludePluginData } from "./ui-workflow";
+import { createObsidianVaultRestoreAccess, restoreVaultFile } from "./vault-restore";
 import {
 	listVaultDirectoriesRecursively,
 	listVaultFilesRecursively,
@@ -23,26 +24,6 @@ function isPlainText(filename: string): boolean {
 	if (filename.endsWith(".canvas")) return true;
 
 	return false;
-}
-
-async function ensureDirectory(app: App, fullpath: string) {
-	const pathElements = fullpath.split("/");
-	pathElements.pop();
-	let c = "";
-	for (const v of pathElements) {
-		c += v;
-		try {
-			await app.vault.createFolder(c);
-		} catch (ex) {
-			// basically skip exceptions.
-			if (ex instanceof Error && ex.message == "Folder already exists.") {
-				// especially this message is.
-			} else {
-				new Notice("Folder Create Error");
-			}
-		}
-		c += "/";
-	}
 }
 
 export default class ScrewDriverPlugin extends Plugin {
@@ -255,6 +236,7 @@ export default class ScrewDriverPlugin extends Plugin {
 			id: "screwdriver-restore",
 			name: "Restore files from this note",
 			editorCallback: async (_editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const restoreAccess = createObsidianVaultRestoreAccess(this.app.vault);
 				if (!("data" in view) || typeof view.data !== "string") {
 					new Notice("Current file is not a valid file.");
 					return;
@@ -288,44 +270,32 @@ export default class ScrewDriverPlugin extends Plugin {
 								continue;
 							}
 
-							let saveData = data;
 							try {
 								const mtime = parseInt(mtimeStr);
-								const stat = await this.app.vault.adapter.stat(filename);
-								if (stat !== null) {
-									if (skipOldFile && mtime < stat.mtime) {
-										new Notice(`File:${filename} is already up to date.`);
-										continue;
-									}
-									if (skipNewFile && mtime >= stat.mtime) {
-										new Notice(`File:${filename} already exists.`);
-										continue;
-									}
+								const result = await restoreVaultFile(restoreAccess, {
+									path: filename,
+									createPayload() {
+										let saveData = data;
+										if ((isPlainText(filename) && dataType != "bin") || dataType == "plain") {
+											saveData = saveData.replace(/\\`/g, "`");
+											saveData = saveData.replace(/\\\\/g, "\\");
+											saveData = saveData.substring(0, saveData.lastIndexOf("\n"));
+											return { kind: "text", data: saveData };
+										}
+										saveData = saveData.substring(0, saveData.lastIndexOf("\n"));
+										return { kind: "binary", data: base64ToArrayBuffer(saveData) };
+									},
+									storedMtime: mtime,
+									skipOldFile,
+									skipNewFile,
+								});
+								if (result === "skipped-up-to-date") {
+									new Notice(`File:${filename} is already up to date.`);
+									continue;
 								}
-								if ((isPlainText(filename) && dataType != "bin") || dataType == "plain") {
-									saveData = saveData.replace(/\\`/g, "`");
-									saveData = saveData.replace(/\\\\/g, "\\");
-									saveData = saveData.substring(
-										0,
-										saveData.lastIndexOf("\n")
-									);
-									await ensureDirectory(this.app, filename);
-									await this.app.vault.adapter.write(
-										filename,
-										saveData
-									);
-								} else {
-									saveData = saveData.substring(
-										0,
-										saveData.lastIndexOf("\n")
-									);
-									const saveDataArrayBuffer =
-										base64ToArrayBuffer(saveData);
-									await ensureDirectory(this.app, filename);
-									await this.app.vault.adapter.writeBinary(
-										filename,
-										saveDataArrayBuffer
-									);
+								if (result === "skipped-existing") {
+									new Notice(`File:${filename} already exists.`);
+									continue;
 								}
 								new Notice(
 									`File:${filename} has been wrote to your device.`

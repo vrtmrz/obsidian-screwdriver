@@ -54,7 +54,15 @@ Real-Obsidian E2E is currently validated on Linux only and is not part of the de
 
 The App-free tests use structural fakes to verify recursive listing results, ignored-subtree behaviour, exact binary data, missing metadata, and deterministic adapter operation counts. These types are an internal consumer pilot, not a neutral Fancy Kit storage API.
 
-Restore writes and directory creation remain outside this boundary. Their overwrite, missing-path, error, and folder-creation semantics need comparison with another consumer before a shared contract is appropriate.
+Restore writes and directory creation use the separate, operation-specific boundary described below. Neither boundary is a neutral Fancy Kit storage API.
+
+## Vault restore boundary
+
+`vault-restore.ts` separates ScrewDriver's overwrite policy from the concrete Obsidian Vault operations. `restoreVaultFile` accepts only metadata, parent-directory preparation, text upsert, and binary upsert capabilities. The production adapter is created once for each restore command and remains bound to the active Vault root.
+
+The adapter checks and creates each successful parent folder once during that command. It confirms folder state structurally instead of matching an English Obsidian error message, and a folder-creation failure stops the affected write. App-free tests preserve the existing modification-time comparisons, including the historical overwrite behaviour for an invalid stored timestamp, and verify operation order, exact binary data, and failure propagation.
+
+These capabilities remain ScrewDriver-owned. In particular, writes are create-or-overwrite operations, the modification-time check is best-effort rather than atomic, and OW path validation provides lexical safety rather than symbolic-link containment. Compare these semantics with another concrete consumer before extracting a neutral storage contract.
 
 ## Restore path boundary
 
