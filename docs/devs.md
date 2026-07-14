@@ -83,3 +83,16 @@ Paths parsed from fenced block headers are untrusted input. `restore-path.ts` us
 With `adjustObsidianDir` enabled, a validated `.obsidian/` suffix is resolved below the trusted `vault.configDir`. Other paths remain Vault-relative. Unsafe input is skipped rather than normalised; this prevents absolute paths, parent traversal, backslash variants, empty components, control characters, and portable-invalid names from changing meaning on another platform.
 
 The App-free suite owns the path policy contract. The local real-Obsidian restore scenario verifies that a safe block is written inside the isolated Vault while an unsafe sibling traversal is not written outside it.
+
+## Release process
+
+The repository uses three manually gated workflows. Configure the GitHub `release` environment with a required reviewer before using them.
+
+1. Run `Prepare Release PR` with the target version. It checks out `main`, runs the locked build and test gate, updates `package.json`, `manifest.json`, and `versions.json`, pushes `release/<version>`, opens a draft pull request, and explicitly dispatches CI for the release branch. Explicit dispatch is required because branch and pull-request events created with `GITHUB_TOKEN` do not start another workflow.
+2. Review the release changes and GitHub Release notes. Keep the pull request in draft and record its full head commit SHA.
+3. Run `Finalise Release Tags` with the version and reviewed SHA, then approve its `release` environment deployment. It validates the exact branch head, creates the tag, and explicitly dispatches `Release Obsidian Plugin`. Explicit dispatch is required because a tag pushed with `GITHUB_TOKEN` does not start a tag-push workflow.
+4. Approve the separate `Release Obsidian Plugin` deployment to the `release` environment, inspect the draft GitHub Release and its assets, then publish it as the latest stable release while leaving the release pull request in draft.
+5. Install the published build through BRAT and verify start-up, target selection, export, and restore behaviour relevant to the release.
+6. After BRAT succeeds, mark the pull request ready and merge it with a merge commit. A merge commit keeps the tagged release commit in `main` history.
+
+If BRAT validation fails, do not move or replace the published tag. Leave the pull request in draft and prepare a new patch release. If the tag exists but publishing dispatch or build fails, rerun `Release Obsidian Plugin` manually for the existing tag instead of rerunning Finalise.
